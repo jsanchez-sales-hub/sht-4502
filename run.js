@@ -140,8 +140,10 @@ async function generateLogsArr(run_ids_set) {
 	});
 	let line = 1;
 	for await (const log of rl) {
-		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0))
+		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0)) {
+			logMemoryUsage();
 			console.log(`[generateLogsArr] Log ${line}...`);
+		}
 
 		let json;
 		try {
@@ -159,6 +161,22 @@ async function generateLogsArr(run_ids_set) {
 	console.log(`Generated All Logs Array.`);
 
 	return logs_arr;
+}
+
+function logMemoryUsage() {
+	const formatMemoryUsage = data =>
+		`${Math.round((data / 1024 / 1024) * 100) / 100} MB`;
+	const formatPerc = num => `${Math.round(num * 10000) / 100}%`;
+	const memoryData = process.memoryUsage();
+
+	const memoryUsage = {
+		rss: `${formatMemoryUsage(memoryData.rss)} -> Resident Set Size - total memory allocated for the process execution`,
+		heapTotal: `${formatMemoryUsage(memoryData.heapTotal)} -> total size of the allocated heap`,
+		heapUsed: `${formatMemoryUsage(memoryData.heapUsed)} -> actual memory used during the execution`,
+		external: `${formatMemoryUsage(memoryData.external)} -> V8 external memory`,
+		heapUsagePerc: `${formatPerc(memoryData.heapUsed / memoryData.heapTotal)} -> memory usage percentage`
+	};
+	console.log(memoryUsage);
 }
 
 /**
@@ -183,8 +201,10 @@ async function generateRunIdsSet() {
 	});
 	let line = 1;
 	for await (const log of rl) {
-		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0))
+		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0)) {
+			logMemoryUsage();
 			console.log(`[generateRunIdsSet] Log ${line}...`);
+		}
 
 		let json;
 		try {
@@ -219,8 +239,10 @@ function generateLogsWithFailedPaymentsArr(logs_arr, run_ids_set) {
 	let index = 1;
 	const logs_with_failed_payments = [];
 	for (const run_id of run_ids_set) {
-		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0))
+		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0)) {
+			logMemoryUsage();
 			console.log(`Evaluating Run ID ${run_id} (${index} of ${total})...`);
+		}
 		const logs_with_run_id = logs_arr.filter(l => l.runId === run_id);
 		if (logs_with_run_id.some(l => l.msg === 'Error while making Requests')) {
 			logs_with_failed_payments.push(...logs_with_run_id);
@@ -293,8 +315,10 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 	const return_array = [];
 	const total = cards_info_arr.length;
 	for (let [index, card_info] of cards_info_arr.entries()) {
-		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0))
+		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0)) {
+			logMemoryUsage();
 			console.log(`Evaluating Card Info ${index + 1} of ${total}...`);
+		}
 
 		// Get the index on which this card's run_id shows up in all_logs. Since all_logs are ordered
 		// chronologically, we can assume we're finding the first instance by time.
@@ -357,7 +381,7 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 
 const asyncMain = async () => {
 	// Automatically download and merge current log.
-	await downloadFromCurrentSrv(true);
+	// await downloadFromCurrentSrv(true);
 
 	/**
 	 * Set of only run_id's of logs that present a payment attempt (successful or not)
