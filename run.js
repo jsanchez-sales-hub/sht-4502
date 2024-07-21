@@ -5,6 +5,15 @@ const { Client: scpClient } = require('node-scp');
 const Decompress = require('decompress');
 const ChildProcess = require('child_process');
 
+const log_storage_path = Path.join(__dirname, 'logs-storage');
+const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
+const current_log_path = Path.join(log_storage_path, 'current.log');
+const previous_instances_log_path = Path.join(
+	log_storage_path,
+	'previous-instances.log'
+);
+const output_path = Path.join(__dirname, 'results', 'cards-info.csv');
+
 /**
  * Sets the amount of logs to be output. Try not to use "all"; the sheer amount of logs
  * can make the whole script much slower.
@@ -71,7 +80,7 @@ async function downloadFromCurrentSrv(zip = false) {
 		local_path = Path.join(__dirname, 'logs-storage', 'current-logs.zip');
 	} else {
 		remote_path = '/home/ubuntu/app/card-payment-generator/logs/all.log';
-		local_path = Path.join(__dirname, 'logs-storage', 'current.log');
+		local_path = current_log_path;
 	}
 
 	const client = await scpClient({
@@ -89,7 +98,7 @@ async function downloadFromCurrentSrv(zip = false) {
 
 	if (zip) {
 		console.log(`Unzipping current log file...`);
-		const output_dir = Path.join(__dirname, 'logs-storage');
+		const output_dir = log_storage_path;
 		await Decompress(local_path, output_dir, {
 			map: file => {
 				file.path = `current.log`;
@@ -102,13 +111,6 @@ async function downloadFromCurrentSrv(zip = false) {
 	}
 
 	console.log(`Merging current log and previous instances' logs...`);
-	const current_log_path = Path.join(__dirname, 'logs-storage', 'current.log');
-	const previous_instances_log_path = Path.join(
-		__dirname,
-		'logs-storage',
-		'previous-instances.log'
-	);
-	const all_time_log_path = log_path;
 	// Create new all-time.log file with previous-instances.log file.
 	Fs.copyFileSync(previous_instances_log_path, all_time_log_path);
 	// Concatenate current.log file into all-time.log. Now we have the full log file.
@@ -131,7 +133,7 @@ async function generateLogsArr(run_ids_set) {
 	const logs_arr = [];
 
 	// Read through file and fill logs_arr array
-	let fileStream = Fs.createReadStream(log_path);
+	let fileStream = Fs.createReadStream(all_time_log_path);
 	let rl = ReadLine.createInterface({
 		input: fileStream,
 		crlfDelay: Infinity
@@ -174,7 +176,7 @@ async function generateRunIdsSet() {
 
 	// Read through file and adds run_id to run_ids_set
 	// TODO - Use grep for this possibly
-	let fileStream = Fs.createReadStream(log_path);
+	let fileStream = Fs.createReadStream(all_time_log_path);
 	let rl = ReadLine.createInterface({
 		input: fileStream,
 		crlfDelay: Infinity
@@ -353,9 +355,6 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 	return return_array;
 }
 
-const log_path = Path.join(__dirname, 'logs-storage', 'all-time.log');
-const curr_log_path = Path.join(__dirname, 'logs-storage', 'current.log');
-
 const asyncMain = async () => {
 	// Automatically download and merge current log.
 	await downloadFromCurrentSrv(true);
@@ -426,10 +425,7 @@ const asyncMain = async () => {
 	 */
 	const cards_info_csv = arrayToCSV(cards_info_wo_false_failures);
 
-	Fs.writeFileSync(
-		Path.join(__dirname, 'results', 'cards-info.csv'),
-		cards_info_csv
-	);
+	Fs.writeFileSync(output_path, cards_info_csv);
 
 	// // Uncomment if you wish to store cards_info as JSON (I don't recommend it, it becomes too large)
 	// Fs.writeFileSync(
