@@ -1,0 +1,19 @@
+{
+	"name": "sht-4502",
+	"version": "1.0.0",
+	"description": "",
+	"main": "run2.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"prettier": "^3.3.3"
+	},
+	"dependencies": {
+		"decompress": "^4.2.1",
+		"node-scp": "^0.0.23"
+	}
+}
