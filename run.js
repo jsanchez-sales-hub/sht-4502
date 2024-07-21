@@ -4,6 +4,7 @@ const ReadLine = require('node:readline');
 const { Client: scpClient } = require('node-scp');
 const Decompress = require('decompress');
 const ChildProcess = require('child_process');
+require('dotenv').config();
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -13,6 +14,7 @@ const previous_instances_log_path = Path.join(
 	'previous-instances.log'
 );
 const output_path = Path.join(__dirname, 'results', 'cards-info.csv');
+const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
 
 /**
  * Sets the amount of logs to be output. Try not to use "all"; the sheer amount of logs
@@ -70,9 +72,7 @@ async function downloadFromCurrentSrv(zip = false) {
 	const host = '18.117.248.41',
 		port = 22,
 		username = 'ubuntu',
-		privateKey = Fs.readFileSync(
-			'/Users/juliosanchez/Documents/ssh-access/pems/card-payment-generator-ec2/ubuntu.pem'
-		);
+		privateKey = Fs.readFileSync(pem_filepath);
 	let remote_path;
 	let local_path;
 	if (zip) {
@@ -381,7 +381,7 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 
 const asyncMain = async () => {
 	// Automatically download and merge current log.
-	// await downloadFromCurrentSrv(true);
+	await downloadFromCurrentSrv(true);
 
 	/**
 	 * Set of only run_id's of logs that present a payment attempt (successful or not)
