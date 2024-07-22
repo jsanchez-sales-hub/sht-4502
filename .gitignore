@@ -147,3 +147,5 @@ archive
 logs-storage-backup
 
 .DS_Store
+
+*.pem
