@@ -15,6 +15,7 @@ const previous_instances_log_path = Path.join(
 );
 const output_path = Path.join(__dirname, 'results', 'cards-info.csv');
 const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
+const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
 
 /**
  * Sets the amount of logs to be output. Try not to use "all"; the sheer amount of logs
@@ -59,6 +60,38 @@ function arrayToCSV(array) {
 	].join('\n'); // Join each row with new lines
 
 	return csv;
+}
+
+/**
+ * Converts CSV string into array of objects
+ * @param {string} csv
+ * @returns { any[] }
+ */
+function csvToArray(csv) {
+	// Split the CSV string into lines
+	const lines = csv.trim().split('\n');
+
+	// Extract the headers from the first line
+	const headers = lines[0].split(',');
+
+	// Initialize an array to hold the resulting objects
+	const result = [];
+
+	// Process each line after the headers
+	for (let i = 1; i < lines.length; i++) {
+		const line = lines[i].split(',');
+
+		// Create an object for the current line
+		const obj = {};
+		for (let j = 0; j < headers.length; j++) {
+			obj[headers[j]] = line[j];
+		}
+
+		// Add the object to the result array
+		result.push(obj);
+	}
+
+	return result;
 }
 
 /**
@@ -379,6 +412,29 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 	return return_array;
 }
 
+/**
+ * Receives array of cards information and array of objects containing payments reported by PNM. If a card is found on PNM (Going by Order ID),
+ * it excludes that card. It returns the resulting array after the filtering.
+ * @param { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[] } cards_info_arr
+ * @param { { Name: string, Account: string, 'Payment Date': string, Status: string, 'Net Customer Payment': string, 'Payment Method': string, 'Payment Type': string }[] } pnm_report_arr
+ * @returns {{ run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[]}
+ */
+function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
+	const total = cards_info_arr.length;
+	const return_arr = cards_info_arr.filter((card_info, index) => {
+		const found_index = pnm_report_arr.findIndex(
+			p => p.Account.trim() === card_info.order_id.trim()
+		);
+		if (found_index < 0) return true;
+		console.log(
+			`Card Number ${card_info.cardNumber} (${index + 1} of ${total}) was successfully used after all.`
+		);
+		return false;
+	});
+
+	return return_arr;
+}
+
 const asyncMain = async () => {
 	// Automatically download and merge current log.
 	await downloadFromCurrentSrv(true);
@@ -443,11 +499,28 @@ const asyncMain = async () => {
 		all_logs
 	);
 
+	let cards_info_output = cards_info_wo_false_failures;
+	if (pnm_report_filepath) {
+		if (!Fs.existsSync(pnm_report_filepath)) {
+			console.log(`PNM Report file does not exist.`);
+		} else {
+			const pnm_report_csv_string =
+				Fs.readFileSync(pnm_report_filepath).toString();
+			const pnm_report_data = csvToArray(pnm_report_csv_string);
+			cards_info_output = removePnmReportedPaid(
+				cards_info_output,
+				pnm_report_data
+			);
+		}
+	} else {
+		console.log(`Will not use PNM Report data.`);
+	}
+
 	/**
 	 * CSV-formatted string of final cards info array.
 	 * @type { string }
 	 */
-	const cards_info_csv = arrayToCSV(cards_info_wo_false_failures);
+	const cards_info_csv = arrayToCSV(cards_info_output);
 
 	Fs.writeFileSync(output_path, cards_info_csv);
 
