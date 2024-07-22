@@ -420,6 +420,7 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
  * @returns {{ run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[]}
  */
 function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
+	console.log(`Removing PNM Reported as Paid...`);
 	const total = cards_info_arr.length;
 	const return_arr = cards_info_arr.filter((card_info, index) => {
 		const found_index = pnm_report_arr.findIndex(
@@ -431,6 +432,8 @@ function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
 		);
 		return false;
 	});
+
+	console.log(`Removed PNM Reported as Paid.`);
 
 	return return_arr;
 }
