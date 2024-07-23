@@ -14,6 +14,13 @@ const previous_instances_log_path = Path.join(
 	'previous-instances.log'
 );
 const output_path = Path.join(__dirname, 'results', 'cards-info.csv');
+
+const processing_attempts_output_path = Path.join(
+	__dirname,
+	'results',
+	'payment-attempts.csv'
+);
+
 const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
 const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
 const isZip = process.env.ZIP_FILE === 'Y';
@@ -216,10 +223,10 @@ async function downloadFromCurrentSrv(zip = false) {
 
 /**
  * Reads Logs files, finds only the logs with the run_id's to be evaluated and returns matches as array of objects
- * @param { Set<string> } run_ids_set
+ * @param { Set<string> | null } run_ids_set
  * @returns
  */
-async function generateLogsArr(run_ids_set) {
+async function generateLogsArr(run_ids_set = null) {
 	console.log(`Generating All Logs Array...`);
 	/**
 	 * Array of objects for all logs (no filter)
@@ -248,7 +255,10 @@ async function generateLogsArr(run_ids_set) {
 			break;
 		}
 
-		if (json.runId && run_ids_set.has(json.runId)) logs_arr.push(json);
+		// Only pushes into array if log has runId AND
+		// run_ids_set is null or includes said runId.
+		if (json.runId && run_ids_set === null) logs_arr.push(json);
+		else if (json.runId && run_ids_set?.has(json.runId)) logs_arr.push(json);
 
 		line++;
 	}
@@ -276,9 +286,10 @@ function logMemoryUsage() {
 
 /**
  * Creates set of strings of logs' run_id only where the program reached a point of logging a card's information.
+ * @param boolean filter
  * @returns
  */
-async function generateRunIdsSet() {
+async function generateRunIdsSet(filter = true) {
 	console.log(`Generating Run IDs Set...`);
 	/**
 	 * Set of run_id's
@@ -309,8 +320,11 @@ async function generateRunIdsSet() {
 			break;
 		}
 
-		// Either of these two msg values logs cardData
-		if (
+		// Add to set only if Filtering is being ignored OR msg coincides with
+		// either of these two msg values (which indicate a log of cardData). runId must also exist.
+		if (json.runId && !filter) {
+			run_ids_set.add(json.runId);
+		} else if (
 			json.runId &&
 			(json.msg === 'Response from processCard' ||
 				json.msg === 'Card stored to use')
@@ -571,15 +585,84 @@ function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
 	return return_arr;
 }
 
+/**
+ * Generates Report containing all the processing attempts, no matter how far they got. It
+ * saves the run_id, timestamp, and Order ID, and stores it in a CSV file.
+ */
+async function generateAttemptsReport() {
+	console.log(`Generating Attempts Report...`);
+
+	const run_ids_set = await generateRunIdsSet(false);
+
+	const logs_arr = await generateLogsArr();
+
+	/**
+	 * Array of objects containing info related to processing attempts.
+	 * @type {{
+	 * 	run_id: string;
+	 * 	timestamp: string;
+	 * 	order_id: string;
+	 * }[]}
+	 */
+	const processing_attempts = [];
+	let index = 1;
+	const total = run_ids_set.size;
+	for (const run_id of run_ids_set) {
+		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0)) {
+			logMemoryUsage();
+			console.log(
+				`[generateAttemptsReport] Run ID ${run_id} (${index} of ${total})...`
+			);
+		}
+
+		const timestamp_item = logs_arr.find(l => l.runId === run_id);
+		const timestamp = timestamp_item?.time
+			? new Date(timestamp_item.time).toISOString()
+			: 'Unknown';
+
+		let order_id = 'Unknown';
+
+		if (timestamp_item?.orderId) {
+			order_id = timestamp_item.orderId;
+		} else {
+			const order_id_item = logs_arr.find(
+				l => l.runId === run_id && !!l.orderId
+			);
+			if (order_id_item?.orderId) {
+				order_id = order_id_item.orderId;
+			}
+		}
+
+		/**
+		 * @type {{
+		 * 	run_id: string;
+		 * 	timestamp: string;
+		 * 	order_id: string;
+		 * }}
+		 */
+		const obj = { run_id, timestamp, order_id };
+
+		processing_attempts.push(obj);
+	}
+
+	const processing_attempts_csv = arrayToCSV(processing_attempts);
+
+	Fs.writeFileSync(processing_attempts_output_path, processing_attempts_csv);
+
+	console.log(`Generated Attempts Report.`);
+}
+
 const asyncMain = async () => {
 	// Automatically download and merge current log.
 	await downloadFromCurrentSrv(isZip);
+
+	await generateAttemptsReport();
 
 	/**
 	 * Set of only run_id's of logs that present a card data log.
 	 * @type { Set<string> }
 	 */
-	const run_ids_set = await generateRunIdsSet();
+	const run_ids_set = await generateRunIdsSet(true);
 
 	/**
 	 * Array of objects for all logs with the run_id's we care about; so only logs that
