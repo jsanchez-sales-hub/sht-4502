@@ -363,7 +363,7 @@ function generateLogsWithFailedPaymentsArr(logs_arr, run_ids_set) {
  * the Run ID, and the Order ID. It removes any duplicate of card numbers, including only the most recent instance of
  * the card.
  * @param { any[] } logs_arr
- * @returns { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[] }
+ * @returns { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number, }[] }
  */
 function generateCardsInfoArray(logs_arr) {
 	console.log(`Generating Cards Info Array...`);
@@ -380,7 +380,13 @@ function generateCardsInfoArray(logs_arr) {
 	let aux_cards_info = [];
 	cards_info.reverse().forEach(c => {
 		if (!aux_cards_info.find(aux_c => aux_c.cardNumber === c.cardNumber)) {
-			aux_cards_info.push(c);
+			const pkg = {
+				...c,
+				trucentiveLink: getTrucentiveLink(logs_arr, c.run_id) ?? 'Unknown',
+				balance: getCardBalance(logs_arr, c.run_id) ?? 'Unknown'
+			};
+
+			aux_cards_info.push(pkg);
 		}
 	});
 	cards_info = aux_cards_info;
@@ -388,6 +394,65 @@ function generateCardsInfoArray(logs_arr) {
 	console.log(`Generated Cards Info Array.`);
 
 	return cards_info;
+}
+
+/**
+ * Looks up Trucentive Link from logs array
+ * @param { any[] } logs_arr
+ * @param { string } run_id
+ * @returns { string | null }
+ */
+function getTrucentiveLink(logs_arr, run_id) {
+	console.log(`Getting Trucentive Link for Run ID ${run_id}...`);
+	const trucentiveLinkMsgRegex =
+		/^Initial card data stored for trucentiveLink: /;
+	let hasTrucentiveLinkProp = false;
+	let hasTrucentiveLinkMsg = false;
+	const item = logs_arr.find(l => {
+		hasTrucentiveLinkProp = !!l.trucentiveLink;
+		hasTrucentiveLinkMsg = trucentiveLinkMsgRegex.test(l.msg);
+		return (
+			l.runId === run_id && (hasTrucentiveLinkProp || hasTrucentiveLinkMsg)
+		);
+	});
+
+	/**
+	 * @type { string | null }
+	 */
+	let trucentiveLink = null;
+
+	if (hasTrucentiveLinkProp) {
+		trucentiveLink = item.trucentiveLink;
+	} else if (hasTrucentiveLinkMsg) {
+		trucentiveLink = item.msg.replace(trucentiveLinkMsgRegex, '');
+	}
+
+	console.log(
+		`Got Trucentive Link for Run ID ${run_id}: ${trucentiveLink ?? 'N/A'}.`
+	);
+
+	return trucentiveLink;
+}
+
+/**
+ * Looks up Card Balance from logs array.
+ * @param { any[] } logs_arr
+ * @param { string } run_id
+ */
+function getCardBalance(logs_arr, run_id) {
+	console.log(`Getting Card Balance for Run ID ${run_id}...`);
+
+	let balance;
+	const item = logs_arr.find(
+		l => l.runId === run_id && l.msg === 'Response from getAmountToCollect'
+	);
+
+	if (item && !isNaN(item.amountData.amount)) {
+		balance = item.amountData.amount;
+	}
+
+	console.log(`Got Card Balance for Run ID ${run_id}: ${balance ?? 'N/A'}.`);
+	return balance;
 }
 
 /**
@@ -406,9 +471,9 @@ function filterLogsWithCardInfo(logs_arr) {
  * For each card in cards_info_arr, it checks if that same card number was used later in a successful payment.
  * If it was, it does not return this card in the return value, since it turns out that that card was in fact
  * used.
- * @param { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[] } cards_info_arr
+ * @param { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number }[] } cards_info_arr
  * @param { any[] } all_logs
- * @returns { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[] }
+ * @returns { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number }[] }
  */
 function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 	console.log(`Removing False Payment Failures...`);
@@ -483,9 +548,9 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 /**
  * Receives array of cards information and array of objects containing payments reported by PNM. If a card is found on PNM (Going by Order ID),
  * it excludes that card. It returns the resulting array after the filtering.
- * @param { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[] } cards_info_arr
+ * @param { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number }[] } cards_info_arr
  * @param { { Name: string, Account: string, 'Payment Date': string, Status: string, 'Net Customer Payment': string, 'Payment Method': string, 'Payment Type': string }[] } pnm_report_arr
- * @returns {{ run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string }[]}
+ * @returns {{ run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number }[]}
  */
 function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
 	console.log(`Removing PNM Reported as Paid...`);
@@ -549,6 +614,8 @@ const asyncMain = async () => {
 	 * 	expirationDate: string;
 	 * 	cvv: string;
 	 * 	lastKnownIp: string;
+	 * 	trucentiveLink: string;
+	 * 	balance: string | number;
 	 * }[]}
 	 */
 	const cards_info = generateCardsInfoArray(logs_with_card_info);
@@ -564,6 +631,8 @@ const asyncMain = async () => {
 	 * 	expirationDate: string;
 	 * 	cvv: string;
 	 * 	lastKnownIp: string;
+	 * 	trucentiveLink: string;
+	 * 	balance: string | number;
 	 * }[]}
 	 */
 	const cards_info_wo_false_failures = removeFalsePaymentFailures(
