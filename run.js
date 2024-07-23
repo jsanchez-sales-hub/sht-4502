@@ -285,8 +285,7 @@ function logMemoryUsage() {
 }
 
 /**
- * Creates set of strings of logs' run_id only where a payment attempt was reached
- * (Successful or not).
+ * Creates set of strings of logs' run_id only where the program reached a point of logging a card's information.
  * @returns
  */
 async function generateRunIdsSet() {
@@ -315,11 +314,17 @@ async function generateRunIdsSet() {
 		try {
 			json = JSON.parse(log);
 		} catch (err) {
+			// This shouldn't happen, as all logs are supposed to be objects.
 			console.error(`Log in position ${line} is not JSON-able: ${log}`);
 			break;
 		}
 
-		if (json.runId && json.method === 'payOnLandingPagePnm') {
+		// Either of these two msg values logs cardData
+		if (
+			json.runId &&
+			(json.msg === 'Response from processCard' ||
+				json.msg === 'Card stored to use')
+		) {
 			run_ids_set.add(json.runId);
 		}
 
@@ -332,9 +337,9 @@ async function generateRunIdsSet() {
 }
 
 /**
- * Loops through run_ids set, collects all logs from each run_id, and checks if the logs include a payment attempt
- * failure (msg: 'Error while making Requests'). If it finds one, it includes all the logs related to that run_id
- * in the returning array. It returns the array sorted by time ascendently.
+ * Loops through run_ids set, collects all logs from each run_id, and checks if the logs include an error during
+ * makeRequests function (msg: 'Error while making Requests'). If it finds one, it includes all the logs related
+ * to that run_id in the returning array. It returns the array sorted by time ascendently.
  * @param { any[] } logs_arr
  * @param { Set<string> } run_ids_set
  */
@@ -379,7 +384,7 @@ function generateCardsInfoArray(logs_arr) {
 		...l.cardData
 	}));
 
-	// Now we sort it descendingly by "time" (Which should be possible by just reversing) to remove duplicates
+	// Now we sort it descendingly by "time" (Which should be possible by just reversing) to then remove duplicates
 	// and keep the most recent instances.
 	console.log(`Sorting Cards Info...`);
 	let aux_cards_info = [];
@@ -446,6 +451,7 @@ function removeFalsePaymentFailures(cards_info_arr, all_logs) {
 			const log = all_logs[i];
 			const log_run_id = log.runId;
 
+			// If run_id should be ignored, continue.
 			if (ignore_run_ids.includes(log_run_id)) continue;
 
 			// Extract cardData from log and compare to card_info. If it doesn't have cardData
@@ -515,20 +521,21 @@ const asyncMain = async () => {
 	await downloadFromCurrentSrv(isZip);
 
 	/**
-	 * Set of only run_id's of logs that present a payment attempt (successful or not)
+	 * Set of only run_id's of logs that present a card data log.
 	 * @type { Set<string> }
 	 */
 	const run_ids_set = await generateRunIdsSet();
 
 	/**
 	 * Array of objects for all logs with the run_id's we care about; so only logs that
-	 * present a payment attempt (successful or not)
+	 * present a card data log.
 	 * @type { any[] }
 	 */
 	const all_logs = await generateLogsArr(run_ids_set);
 
 	/**
-	 * Subset of logs from all_logs that present a failed payment attempt.
+	 * Subset of logs from all_logs that present a failed makeRequests function execution. Meaning, payment
+	 * failed or something else failed.
 	 * @type { any[] }
 	 */
 	const logs_with_failed_payments = generateLogsWithFailedPaymentsArr(
