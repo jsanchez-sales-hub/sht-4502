@@ -4,6 +4,7 @@ const ReadLine = require('node:readline');
 const { Client: scpClient } = require('node-scp');
 const Decompress = require('decompress');
 const ChildProcess = require('child_process');
+const SSHClient = require('ssh2').Client;
 require('dotenv').config();
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
@@ -16,6 +17,14 @@ const previous_instances_log_path = Path.join(
 const output_path = Path.join(__dirname, 'results', 'cards-info.csv');
 const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
 const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
+const isZip = process.env.ZIP_FILE === 'Y';
+
+const ssh = {
+	host: '18.117.248.41',
+	port: 22,
+	username: 'ubuntu',
+	privateKey: Fs.readFileSync(pem_filepath)
+};
 
 /**
  * Sets the amount of logs to be output. Try not to use "all"; the sheer amount of logs
@@ -95,32 +104,95 @@ function csvToArray(csv) {
 }
 
 /**
+ * Executes line command via SSH session.
+ * @param {string} command
+ * @returns
+ */
+async function executeSSH(command) {
+	return new Promise((resolve, reject) => {
+		console.log(`Executing command "${command}" via SSH...`);
+
+		// Create a new SSH client instance
+		const sshClient = new SSHClient();
+		// Configure the connection parameters
+		const connectionParams = {
+			host: ssh.host,
+			username: ssh.username,
+			privateKey: ssh.privateKey
+		};
+		// Connect to the SSH server
+		sshClient.connect(connectionParams);
+
+		sshClient.on('ready', () => {
+			console.log('Connected via SSH');
+			sshClient.exec(command, (err, stream) => {
+				if (err) return reject(err);
+
+				let stdout = '';
+				let stderr = '';
+
+				stream
+					.on('close', (code, signal) => {
+						console.log(
+							`Command execution closed with code ${code} and signal ${signal}.`
+						);
+						sshClient.end();
+						if (code === 0) {
+							resolve(stdout);
+						} else {
+							reject(new Error(stderr));
+						}
+					})
+					.on('data', data => {
+						stdout += data.toString();
+					})
+					.stderr.on('data', data => {
+						stderr += data.toString();
+					});
+			});
+		});
+
+		sshClient.on('error', err => {
+			console.error('Error connecting via SSH:', err);
+			reject(err);
+		});
+	});
+}
+
+/**
  * Downloads current instance's log file to ./logs-storage/current.log.
  * @param {boolean} zip
  */
 async function downloadFromCurrentSrv(zip = false) {
 	console.log(`Downloading current log file...`);
 
-	// TODO - zip before downloading, download zip, and unzip after downloading; file is just too big.
-	const host = '18.117.248.41',
-		port = 22,
-		username = 'ubuntu',
-		privateKey = Fs.readFileSync(pem_filepath);
+	const remote_log_path =
+		'/home/ubuntu/app/card-payment-generator/logs/all.log';
+	const remote_zip_path =
+		'/home/ubuntu/app/card-payment-generator/logs/all-logs.zip';
+	const local_log_path = current_log_path;
+	const local_zip_path = Path.join(
+		__dirname,
+		'logs-storage',
+		'current-logs.zip'
+	);
 	let remote_path;
 	let local_path;
 	if (zip) {
-		remote_path = '/home/ubuntu/app/card-payment-generator/logs/all-logs.zip';
-		local_path = Path.join(__dirname, 'logs-storage', 'current-logs.zip');
+		// Zip file via SSH session.
+		await executeSSH(`zip "${remote_zip_path}" "${remote_log_path}"`);
+		remote_path = remote_zip_path;
+		local_path = local_zip_path;
 	} else {
-		remote_path = '/home/ubuntu/app/card-payment-generator/logs/all.log';
-		local_path = current_log_path;
+		remote_path = remote_log_path;
+		local_path = local_log_path;
 	}
 
 	const client = await scpClient({
-		host,
-		port,
-		username,
-		privateKey
+		host: ssh.host,
+		port: ssh.port,
+		username: ssh.username,
+		privateKey: ssh.privateKey
 	});
 
 	await client.downloadFile(remote_path, local_path);
@@ -440,7 +512,7 @@ function removePnmReportedPaid(cards_info_arr, pnm_report_arr) {
 
 const asyncMain = async () => {
 	// Automatically download and merge current log.
-	await downloadFromCurrentSrv(true);
+	await downloadFromCurrentSrv(isZip);
 
 	/**
 	 * Set of only run_id's of logs that present a payment attempt (successful or not)
@@ -539,4 +611,6 @@ const asyncMain = async () => {
 
 asyncMain()
 	.then(() => console.log('Finished'))
-	.catch(err => console.error(err));
+	.catch(err => {
+		console.error(`General Error:`, err);
+	});
