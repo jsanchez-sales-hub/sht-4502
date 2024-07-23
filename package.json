@@ -13,7 +13,6 @@
 		"prettier": "^3.3.3"
 	},
 	"dependencies": {
-		"decompress": "^4.2.1",
 		"dotenv": "^16.4.5",
 		"node-scp": "^0.0.23",
 		"ssh2": "^1.15.0"

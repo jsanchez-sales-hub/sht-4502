@@ -2,7 +2,6 @@ const Fs = require('fs');
 const Path = require('path');
 const ReadLine = require('node:readline');
 const { Client: scpClient } = require('node-scp');
-const Decompress = require('decompress');
 const ChildProcess = require('child_process');
 const SSHClient = require('ssh2').Client;
 require('dotenv').config();
@@ -195,12 +194,12 @@ async function downloadFromCurrentSrv(zip = false) {
 	if (zip) {
 		console.log(`Unzipping current log file...`);
 		const output_dir = log_storage_path;
-		await Decompress(local_path, output_dir, {
-			map: file => {
-				file.path = `current.log`;
-				return file;
-			}
-		});
+		// Unzips to {output_dir}/all.log
+		ChildProcess.execSync(`unzip ${local_path} -d ${output_dir}`);
+		// Renames file to current.log
+		ChildProcess.execSync(
+			`mv ${Path.join(output_dir, 'all.log')} ${Path.join(output_dir, 'current.log')}`
+		);
 		// Remove compressed file (Just as cleanup)
 		Fs.unlinkSync(local_path);
 		console.log(`Unzipped current log file.`);
