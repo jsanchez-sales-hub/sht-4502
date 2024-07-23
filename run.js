@@ -166,26 +166,17 @@ async function executeSSH(command) {
 async function downloadFromCurrentSrv(zip = false) {
 	console.log(`Downloading current log file...`);
 
-	const remote_log_path =
-		'/home/ubuntu/app/card-payment-generator/logs/all.log';
-	const remote_zip_path =
-		'/home/ubuntu/app/card-payment-generator/logs/all-logs.zip';
-	const local_log_path = current_log_path;
-	const local_zip_path = Path.join(
-		__dirname,
-		'logs-storage',
-		'current-logs.zip'
-	);
 	let remote_path;
 	let local_path;
 	if (zip) {
 		// Zip file via SSH session.
-		await executeSSH(`zip "${remote_zip_path}" "${remote_log_path}"`);
-		remote_path = remote_zip_path;
-		local_path = local_zip_path;
+		const remote_zip_dir = '/home/ubuntu/app/card-payment-generator/logs';
+		await executeSSH(`cd ${remote_zip_dir} && zip all-logs.zip all.log`);
+		remote_path = '/home/ubuntu/app/card-payment-generator/logs/all-logs.zip';
+		local_path = Path.join(__dirname, 'logs-storage', 'current-logs.zip');
 	} else {
-		remote_path = remote_log_path;
-		local_path = local_log_path;
+		remote_path = '/home/ubuntu/app/card-payment-generator/logs/all.log';
+		local_path = current_log_path;
 	}
 
 	const client = await scpClient({
