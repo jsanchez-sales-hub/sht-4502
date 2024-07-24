@@ -24,6 +24,7 @@ const processing_attempts_output_path = Path.join(
 const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
 const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
 const isZip = process.env.ZIP_FILE === 'Y';
+const downloadCurrentLogs = process.env.DOWNLOAD_CURRENT_LOGS == 'Y';
 
 const ssh = {
 	host: '18.117.248.41',
@@ -654,7 +655,7 @@ async function generateAttemptsReport() {
 
 const asyncMain = async () => {
 	// Automatically download and merge current log.
-	await downloadFromCurrentSrv(isZip);
+	if (downloadCurrentLogs) await downloadFromCurrentSrv(isZip);
 
 	await generateAttemptsReport();
 
