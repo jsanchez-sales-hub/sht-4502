@@ -644,6 +644,8 @@ async function generateAttemptsReport() {
 		const obj = { run_id, timestamp, order_id };
 
 		processing_attempts.push(obj);
+
+		index++;
 	}
 
 	const processing_attempts_csv = arrayToCSV(processing_attempts);
