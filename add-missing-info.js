@@ -173,7 +173,7 @@ const asyncMain = async () => {
 	const parallel_threads = 20;
 	const total = cards_info_arr.length;
 
-	for (let index = 0; index < total; index++) {
+	for (let index = 0; index < total; true) {
 		// for (let [index, card_info] of cards_info_arr.entries()) {
 
 		const promises_arr = [];
