@@ -375,14 +375,15 @@ function generateLogsWithFailedPaymentsArr(logs_arr, run_ids_set) {
 
 /**
  * Generates array of objects with only the cardData property of the logs, its timestamp in readable ISOString format,
- * the Run ID, and the Order ID. It removes any duplicate of card numbers, including only the most recent instance of
- * the card.
- * @param { any[] } logs_arr
+ * the Run ID, and the Order ID. It removes any duplicate of card numbers and includes only the most recent instance of
+ * the card. It also obtains the trucentive link and card balance by looking up in all the logs.
+ * @param { any[] } logs_with_cards
+ * @param { any[] } all_logs
  * @returns { { run_id: string, order_id: string, timestamp: string, cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string, trucentiveLink: string, balance: string | number, }[] }
  */
-function generateCardsInfoArray(logs_arr) {
+function generateCardsInfoArray(logs_with_cards, all_logs) {
 	console.log(`Generating Cards Info Array...`);
-	let cards_info = logs_arr.map(l => ({
+	let cards_info = logs_with_cards.map(l => ({
 		run_id: l.runId,
 		order_id: l.orderId ?? 'Unknown',
 		timestamp: new Date(l.time).toISOString(),
@@ -397,8 +398,8 @@ function generateCardsInfoArray(logs_arr) {
 		if (!aux_cards_info.find(aux_c => aux_c.cardNumber === c.cardNumber)) {
 			const pkg = {
 				...c,
-				trucentiveLink: getTrucentiveLink(logs_arr, c.run_id) ?? 'Unknown',
-				balance: getCardBalance(logs_arr, c.run_id) ?? 'Unknown'
+				trucentiveLink: getTrucentiveLink(all_logs, c.run_id) ?? 'Unknown',
+				balance: getCardBalance(all_logs, c.run_id) ?? 'Unknown'
 			};
 
 			aux_cards_info.push(pkg);
@@ -423,11 +424,16 @@ function getTrucentiveLink(logs_arr, run_id) {
 		/^Initial card data stored for trucentiveLink: /;
 	let hasTrucentiveLinkProp = false;
 	let hasTrucentiveLinkMsg = false;
+	let hasDeepTrucentiveLinkProp = false;
 	const item = logs_arr.find(l => {
 		hasTrucentiveLinkProp = !!l.trucentiveLink;
 		hasTrucentiveLinkMsg = trucentiveLinkMsgRegex.test(l.msg);
+		hasDeepTrucentiveLinkProp = !!l?.availableStoredCard?.trucentiveLink;
 		return (
-			l.runId === run_id && (hasTrucentiveLinkProp || hasTrucentiveLinkMsg)
+			l.runId === run_id &&
+			(hasTrucentiveLinkProp ||
+				hasTrucentiveLinkMsg ||
+				hasDeepTrucentiveLinkProp)
 		);
 	});
 
@@ -440,6 +446,8 @@ function getTrucentiveLink(logs_arr, run_id) {
 		trucentiveLink = item.trucentiveLink;
 	} else if (hasTrucentiveLinkMsg) {
 		trucentiveLink = item.msg.replace(trucentiveLinkMsgRegex, '');
+	} else if (hasDeepTrucentiveLinkProp) {
+		trucentiveLink = item.availableStoredCard.trucentiveLink;
 	}
 
 	console.log(
@@ -704,7 +712,7 @@ const asyncMain = async () => {
 	 * 	balance: string | number;
 	 * }[]}
 	 */
-	const cards_info = generateCardsInfoArray(logs_with_card_info);
+	const cards_info = generateCardsInfoArray(logs_with_card_info, all_logs);
 
 	/**
 	 * Array of objects containing cards info, excluding the ones that were found to be later use successfuly.
