@@ -4,6 +4,7 @@ const { Client: scpClient } = require('node-scp');
 const ChildProcess = require('child_process');
 const SSHClient = require('ssh2').Client;
 require('dotenv').config();
+const PM2 = require('pm2');
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -136,32 +137,35 @@ async function downloadFromCurrentSrv(zip = false) {
 	console.log(`Merged current log and previous instances' logs.`);
 }
 
+const connectToPm2 = async () => {
+	return new Promise((resolve, reject) => {
+		PM2.connect(connect_err => {
+			if (connect_err) return reject(connect_err);
+			return resolve(PM2);
+		});
+	});
+};
+
 /**
  *
  * @param {'unused-cards-report' | 'payment-attempts-report'} script
  */
 const startPm2 = async script => {
-	const PM2 = require('pm2');
-
 	return new Promise((resolve, reject) => {
-		PM2.connect(connect_err => {
-			if (connect_err) return reject(connect_err);
+		const json_config_file = Path.join(
+			__dirname,
+			script === 'unused-cards-report'
+				? 'unused-cards.config.js'
+				: 'payment-attempts.config.js'
+		);
 
-			const json_config_file = Path.join(
-				__dirname,
-				script === 'unused-cards-report'
-					? 'unused-cards.config.js'
-					: 'payment-attempts.config.js'
-			);
+		PM2.start(json_config_file, (start_err, apps) => {
+			if (start_err) {
+				PM2.disconnect();
+				return reject(start_err);
+			}
 
-			PM2.start(json_config_file, (start_err, apps) => {
-				if (start_err) {
-					PM2.disconnect();
-					return reject(start_err);
-				}
-
-				return resolve(null);
-			});
+			return resolve(null);
 		});
 	});
 };
@@ -170,8 +174,12 @@ const asyncMain = async () => {
 	// Automatically download and merge current log.
 	if (downloadCurrentLogs) await downloadFromCurrentSrv(isZip);
 
+	await connectToPm2();
+
 	await startPm2('payment-attempts-report');
 	await startPm2('unused-cards-report');
+
+	return;
 };
 
 asyncMain()

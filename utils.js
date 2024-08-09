@@ -1,4 +1,15 @@
 /**
+ *
+ * @param {number} ms
+ * @returns
+ */
+const waitFor = async ms => {
+	return new Promise((resolve, reject) => {
+		setTimeout(resolve, ms);
+	});
+};
+
+/**
  * Converts array of objects into CSV string
  * @param { any[] } array
  * @returns
@@ -71,4 +82,4 @@ const logMemoryUsage = () => {
 	console.log(memoryUsage);
 };
 
-module.exports = { arrayToCSV, csvToArray, logMemoryUsage };
+module.exports = { waitFor, arrayToCSV, csvToArray, logMemoryUsage };

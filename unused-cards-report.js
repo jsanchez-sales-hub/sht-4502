@@ -1,7 +1,7 @@
 const Fs = require('fs');
 const Path = require('path');
 const ReadLine = require('node:readline');
-const { arrayToCSV, csvToArray, logMemoryUsage } = require('./utils');
+const { arrayToCSV, csvToArray, logMemoryUsage, waitFor } = require('./utils');
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -481,7 +481,7 @@ const asyncMain = async () => {
 };
 
 asyncMain()
-	.then(() => console.log('Finished'))
+	.then(() => console.log('Unused Cards Report Finished'))
 	.catch(err => {
 		console.error(`General Error:`, err);
 	});

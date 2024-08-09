@@ -2,7 +2,7 @@ const ReadLine = require('node:readline');
 const Fs = require('fs');
 const Path = require('path');
 
-const { logMemoryUsage, arrayToCSV } = require('./utils');
+const { logMemoryUsage, arrayToCSV, waitFor } = require('./utils');
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -193,7 +193,7 @@ async function generateAttemptsReport() {
 }
 
 generateAttemptsReport()
-	.then(() => console.log('Finished'))
+	.then(() => console.log('Payment Attempts Report Finished'))
 	.catch(err => {
 		console.error(`General Error:`, err);
 	});
