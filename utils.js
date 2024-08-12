@@ -163,11 +163,8 @@ const execute = async command => {
 				//some err occurred
 				reject(err);
 				return;
-			} else {
-				// the *entire* stdout and stderr (buffered)
-				console.log(`stdout: ${stdout}`);
-				console.log(`stderr: ${stderr}`);
 			}
+			resolve(stdout);
 		});
 	});
 };

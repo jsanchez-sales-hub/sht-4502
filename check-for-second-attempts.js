@@ -28,7 +28,12 @@ const asyncMain = async () => {
 
 		const grep_command = `grep "${card_number}" ${all_time_log_path}`;
 
+		/**
+		 * @type { string }
+		 */
 		const grep_result = await execute(grep_command);
+
+		console.log(typeof grep_result);
 
 		console.log(grep_result);
 		break;
