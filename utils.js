@@ -1,3 +1,15 @@
+const Fs = require('fs');
+const { exec } = require('child_process');
+const SSHClient = require('ssh2').Client;
+
+const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
+const ssh = {
+	host: '18.117.248.41',
+	port: 22,
+	username: 'ubuntu',
+	privateKey: Fs.readFileSync(pem_filepath)
+};
+
 /**
  *
  * @param {number} ms
@@ -56,7 +68,8 @@ const csvToArray = csv => {
 		// Create an object for the current line
 		const obj = {};
 		for (let j = 0; j < headers.length; j++) {
-			obj[headers[j]] = line[j];
+			// @ts-ignore
+			obj[headers[j]] = line[j].replaceAll(/^"|"$/g, '');
 		}
 
 		// Add the object to the result array
@@ -82,4 +95,88 @@ const logMemoryUsage = () => {
 	console.log(memoryUsage);
 };
 
-module.exports = { waitFor, arrayToCSV, csvToArray, logMemoryUsage };
+/**
+ * Executes line command via SSH session.
+ * @param {string} command
+ * @returns
+ */
+const executeSSH = async command => {
+	return new Promise((resolve, reject) => {
+		console.log(`Executing command "${command}" via SSH...`);
+
+		// Create a new SSH client instance
+		const sshClient = new SSHClient();
+		// Configure the connection parameters
+		const connectionParams = {
+			host: ssh.host,
+			username: ssh.username,
+			privateKey: ssh.privateKey
+		};
+		// Connect to the SSH server
+		sshClient.connect(connectionParams);
+
+		sshClient.on('ready', () => {
+			console.log('Connected via SSH');
+			sshClient.exec(command, (err, stream) => {
+				if (err) return reject(err);
+
+				let stdout = '';
+				let stderr = '';
+
+				stream
+					.on('close', (code, signal) => {
+						console.log(
+							`Command execution closed with code ${code} and signal ${signal}.`
+						);
+						sshClient.end();
+						if (code === 0) {
+							resolve(stdout);
+						} else {
+							reject(new Error(stderr));
+						}
+					})
+					.on('data', data => {
+						stdout += data.toString();
+					})
+					.stderr.on('data', data => {
+						stderr += data.toString();
+					});
+			});
+		});
+
+		sshClient.on('error', err => {
+			console.error('Error connecting via SSH:', err);
+			reject(err);
+		});
+	});
+};
+
+/**
+ *
+ * @param {string} command
+ */
+const execute = async command => {
+	return new Promise((resolve, reject) => {
+		console.log(`Executing command: ${command}`);
+		exec(command, (err, stdout, stderr) => {
+			if (err) {
+				//some err occurred
+				reject(err);
+				return;
+			} else {
+				// the *entire* stdout and stderr (buffered)
+				console.log(`stdout: ${stdout}`);
+				console.log(`stderr: ${stderr}`);
+			}
+		});
+	});
+};
+
+module.exports = {
+	waitFor,
+	arrayToCSV,
+	csvToArray,
+	logMemoryUsage,
+	executeSSH,
+	execute
+};
