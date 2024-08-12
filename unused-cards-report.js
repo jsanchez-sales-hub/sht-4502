@@ -275,9 +275,20 @@ const filterLogsWithCardInfo = logs_arr => {
  * @returns {{ cardNumber: string, expirationDate: string, cvv: string, lastKnownIp: string } | null}
  */
 const extractCardData = log => {
-	if (log.cardData) {
-		return log.cardData;
+	// First Attempt logs property "cardData" with all info.
+	if (log.cardData) return log.cardData;
+
+	if (log.availableStoredCard) {
+		// Second Attempt logs property "availableStoredCard" with information more scattered.
+		const card_info = log.availableStoredCard;
+		return {
+			cardNumber: card_info.cardNumber,
+			expirationDate: card_info.expirationDate,
+			cvv: card_info,
+			lastKnownIp: ''
+		};
 	}
+
 	return null;
 };
 
