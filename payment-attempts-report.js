@@ -136,7 +136,8 @@ async function generateLogsArr(run_ids_set = null) {
  */
 function groupTimestampsByDay(timestamps) {
 	const grouped = timestamps.reduce((acc, timestamp) => {
-		const date = timestamp.split('T')[0]; // Extract the date part (YYYY-MM-DD)
+		// @ts-ignore
+		const date = timestamp.replaceAll('"', '').split('T')[0]; // Extract the date part (YYYY-MM-DD)
 		if (!acc[date]) {
 			acc[date] = 0;
 		}
