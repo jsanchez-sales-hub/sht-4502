@@ -13,6 +13,12 @@ const processing_attempts_output_path = Path.join(
 	'payment-attempts.csv'
 );
 
+const grouped_processing_attempts_output_path = Path.join(
+	__dirname,
+	'results',
+	'payment-attempts-grouped.csv'
+);
+
 /**
  * Sets the amount of logs to be output. Try not to use "all"; the sheer amount of logs
  * can make the whole script much slower.
@@ -124,6 +130,38 @@ async function generateLogsArr(run_ids_set = null) {
 }
 
 /**
+ *
+ * @param {string[]} timestamps
+ * @returns
+ */
+function groupTimestampsByDay(timestamps) {
+	const grouped = timestamps.reduce((acc, timestamp) => {
+		const date = timestamp.split('T')[0]; // Extract the date part (YYYY-MM-DD)
+		if (!acc[date]) {
+			acc[date] = 0;
+		}
+		acc[date]++;
+		return acc;
+	}, {});
+
+	const dateStrings = Object.keys(grouped);
+	const startDate = new Date(dateStrings[0]);
+	const endDate = new Date(dateStrings[dateStrings.length - 1]);
+
+	// Generate an array of all dates between startDate and endDate
+	const allDates = [];
+	for (let d = startDate; d <= endDate; d.setDate(d.getDate() + 1)) {
+		const dateStr = d.toISOString().split('T')[0];
+		allDates.push(dateStr);
+	}
+
+	return allDates.map(date => ({
+		Date: date,
+		Amount: grouped[date] || 0
+	}));
+}
+
+/**
  * Generates Report containing all the processing attempts, no matter how far they got. It
  * saves the run_id, timestamp, and Order ID, and stores it in a CSV file.
  */
@@ -185,9 +223,16 @@ async function generateAttemptsReport() {
 		index++;
 	}
 
+	// Write raw list
 	const processing_attempts_csv = arrayToCSV(processing_attempts);
-
 	Fs.writeFileSync(processing_attempts_output_path, processing_attempts_csv);
+
+	// Group list by Date
+	const grouped_arr = groupTimestampsByDay(
+		processing_attempts.map(a => a.timestamp)
+	);
+	const grouped_csv = arrayToCSV(grouped_arr);
+	Fs.writeFileSync(grouped_processing_attempts_output_path, grouped_csv);
 
 	console.log(`Generated Attempts Report.`);
 }
