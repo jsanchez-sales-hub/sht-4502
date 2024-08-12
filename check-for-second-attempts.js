@@ -72,7 +72,10 @@ const asyncMain = async () => {
 
 		// No other Run ID mentioned this card number; skip.
 		if (run_ids_set.size === 0) {
-			console.log(`No other Run ID's show this card number. Continuing.`);
+			console.log(
+				`No other Run ID's show this card number. Adding this to new array and continuing.`
+			);
+			new_cards_info_arr.push(card_info);
 			continue;
 		}
 
