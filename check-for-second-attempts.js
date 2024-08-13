@@ -163,29 +163,30 @@ const asyncMain = async () => {
 	const cards_info_csv = Fs.readFileSync(cards_info_path).toString();
 	const cards_info_arr = csvToArray(cards_info_csv);
 	const total = cards_info_arr.length;
+	const parallel_processes = 10;
 
 	const new_cards_info_arr = [];
+	let index = 0;
 
-	for (let [index, card_info] of cards_info_arr.entries()) {
-		const {
-			run_id,
-			order_id,
-			timestamp,
-			cardNumber,
-			expirationDate,
-			cvv,
-			lastKnownIp,
-			trucentiveLink,
-			balance
-		} = card_info;
+	while (index < total) {
+		const promises = [];
+		for (let j = 0; j < parallel_processes; j++) {
+			if (index >= cards_info_arr.length) break;
 
-		console.log(
-			`Checking element ${index + 1} of ${total}: Card ${cardNumber}`
-		);
+			const card_info = cards_info_arr[index];
 
-		const payload = await processSingle(card_info, index, start_from);
+			console.log(
+				`Checking element ${index + 1} of ${total}: Card ${card_info.cardNumber}`
+			);
 
-		if (payload) new_cards_info_arr.push(card_info);
+			promises.push(processSingle(card_info, index, start_from));
+
+			index++;
+		}
+
+		const payloads = await Promise.all(promises);
+
+		payloads.filter(p => !!p).forEach(p => new_cards_info_arr.push(p));
 	}
 
 	/**
