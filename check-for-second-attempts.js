@@ -32,6 +32,7 @@ const output_path = Path.join(__dirname, 'results', 'cards-info-revised.csv');
  * 	balance: string
  * }} card_info
  * @param { number } index
+ * @param { number } total
  * @param { number } start_from
  * @returns {Promise<{
  * 	run_id: string,
@@ -45,7 +46,7 @@ const output_path = Path.join(__dirname, 'results', 'cards-info-revised.csv');
  * 	balance: string
  * } | undefined>}
  */
-const processSingle = async (card_info, index, start_from = 0) => {
+const processSingle = async (card_info, index, total, start_from = 0) => {
 	const {
 		run_id,
 		order_id,
@@ -59,24 +60,26 @@ const processSingle = async (card_info, index, start_from = 0) => {
 	} = card_info;
 	if (cardNumber.length !== 16) {
 		console.log(
-			`This card number does not have 16 characters. Will include it in new array, but it should be looked over.`
+			`[${run_id}][${cardNumber}][${index + 1} of ${total}] This card number does not have 16 characters. Will include it in new array, but it should be looked over.`
 		);
 		return card_info;
 	}
 
 	if (index < start_from) {
-		console.log(`This element was already processed before.`);
+		console.log(
+			`[${run_id}][${cardNumber}][${index + 1} of ${total}] This element was already processed before.`
+		);
 		// If index < start_from, we already evaluated, there's no longer need for grep.
 		// If it's in the already_found array, we should not include it in the new array.
 		// If it's not in the already_found array, we should include it.
 		if (already_found.includes(cardNumber)) {
 			console.log(
-				`Run ID ${run_id} already processed in the past: It was in the already_found array. Removing it from new array.`
+				`[${run_id}][${cardNumber}][${index + 1} of ${total}] Run ID ${run_id} already processed in the past: It was in the already_found array. Removing it from new array.`
 			);
 			return;
 		} else {
 			console.log(
-				`Run ID ${run_id} already processed in the past: It was not in the already_found array. Adding it to new array.`
+				`[${run_id}][${cardNumber}][${index + 1} of ${total}] Run ID ${run_id} already processed in the past: It was not in the already_found array. Adding it to new array.`
 			);
 			return card_info;
 		}
@@ -118,7 +121,7 @@ const processSingle = async (card_info, index, start_from = 0) => {
 	// No other Run ID mentioned this card number; skip.
 	if (run_ids_set.size === 0) {
 		console.log(
-			`No other Run ID's show this card number. Adding this to new array and continuing.`
+			`[${run_id}][${cardNumber}][${index + 1} of ${total}] No other Run ID's show this card number. Adding this to new array and continuing.`
 		);
 		return card_info;
 	}
@@ -147,13 +150,13 @@ const processSingle = async (card_info, index, start_from = 0) => {
 
 	if (successful_attempt) {
 		console.log(
-			`Run ID ${successful_attempt.runId} was actually successful with this one. Removing it from new array.`
+			`[${run_id}][${cardNumber}][${index + 1} of ${total}] Run ID ${successful_attempt.runId} was actually successful with this one. Removing it from new array.`
 		);
 		return;
 	}
 
 	console.log(
-		`Card Number was not successfully used after all it seems. Adding it to new array.`
+		`[${run_id}][${cardNumber}][${index + 1} of ${total}] Card Number was not successfully used after all it seems. Adding it to new array.`
 	);
 
 	return card_info;
@@ -179,7 +182,7 @@ const asyncMain = async () => {
 				`Checking element ${index + 1} of ${total}: Card ${card_info.cardNumber}`
 			);
 
-			promises.push(processSingle(card_info, index, start_from));
+			promises.push(processSingle(card_info, index, total, start_from));
 
 			index++;
 		}
