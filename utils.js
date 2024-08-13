@@ -158,7 +158,7 @@ const executeSSH = async command => {
 const execute = async command => {
 	return new Promise((resolve, reject) => {
 		console.log(`Executing command: ${command}`);
-		exec(command, (err, stdout, stderr) => {
+		exec(command, { maxBuffer: 1024 * 1024 * 128 }, (err, stdout, stderr) => {
 			if (err) {
 				//some err occurred
 				reject(err);

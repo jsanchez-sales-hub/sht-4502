@@ -8,6 +8,10 @@ const {
 	executeSSH,
 	execute
 } = require('./utils');
+const {
+	already_found,
+	start_from
+} = require('./second-attempts-storage/duplicates');
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -36,6 +40,33 @@ const asyncMain = async () => {
 		console.log(
 			`Checking element ${index + 1} of ${total}: Card ${cardNumber}`
 		);
+
+		if (cardNumber.length !== 16) {
+			console.log(
+				`This card number does not have 16 characters. Will include it in new array, but it should be looked over.`
+			);
+			new_cards_info_arr.push(card_info);
+			continue;
+		}
+
+		if (index < start_from) {
+			console.log(`This element was already processed before.`);
+			// If index < start_from, we already evaluated, there's no longer need for grep.
+			// If it's in the already_found array, we should not include it in the new array.
+			// If it's not in the already_found array, we should include it.
+			if (already_found.includes(cardNumber)) {
+				console.log(
+					`Run ID ${run_id} already processed in the past: It was in the already_found array. Removing it from new array.`
+				);
+				continue;
+			} else {
+				console.log(
+					`Run ID ${run_id} already processed in the past: It was not in the already_found array. Adding it to new array.`
+				);
+				new_cards_info_arr.push(card_info);
+				continue;
+			}
+		}
 
 		let grep_command = `grep "${cardNumber}" ${all_time_log_path}`;
 
