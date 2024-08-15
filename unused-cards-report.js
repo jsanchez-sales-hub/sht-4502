@@ -1,7 +1,7 @@
 const Fs = require('fs');
 const Path = require('path');
 const ReadLine = require('node:readline');
-const { arrayToCSV, csvToArray, logMemoryUsage, waitFor } = require('./utils');
+const { arrayToCSV, csvToArray, waitFor } = require('./utils');
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
@@ -39,7 +39,6 @@ const generateRunIdsSet = async (filter = true) => {
 	let line = 1;
 	for await (const log of rl) {
 		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0)) {
-			logMemoryUsage();
 			console.log(`[generateRunIdsSet] Log ${line}...`);
 		}
 
@@ -94,7 +93,6 @@ const generateLogsArr = async (run_ids_set = null) => {
 	let line = 1;
 	for await (const log of rl) {
 		if (LOG === 'all' || (LOG === 'mid' && line % 100 === 0)) {
-			logMemoryUsage();
 			console.log(`[generateLogsArr] Log ${line}...`);
 		}
 
@@ -133,7 +131,6 @@ const generateLogsWithFailedPaymentsArr = (logs_arr, run_ids_set) => {
 	const logs_with_failed_payments = [];
 	for (const run_id of run_ids_set) {
 		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0)) {
-			logMemoryUsage();
 			console.log(`Evaluating Run ID ${run_id} (${index} of ${total})...`);
 		}
 		const logs_with_run_id = logs_arr.filter(l => l.runId === run_id);
@@ -306,7 +303,6 @@ const removeFalsePaymentFailures = (cards_info_arr, all_logs) => {
 	const total = cards_info_arr.length;
 	for (let [index, card_info] of cards_info_arr.entries()) {
 		if (LOG === 'all' || (LOG === 'mid' && index % 100 === 0)) {
-			logMemoryUsage();
 			console.log(`Evaluating Card Info ${index + 1} of ${total}...`);
 		}
 
