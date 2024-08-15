@@ -2,6 +2,7 @@ const Fs = require('fs');
 const Path = require('path');
 const ReadLine = require('node:readline');
 const { arrayToCSV, csvToArray, waitFor } = require('./utils');
+require('dotenv').config();
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
