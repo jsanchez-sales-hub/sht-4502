@@ -224,43 +224,68 @@ const getCardBalance = (logs_arr, run_id) => {
  */
 const generateCardsInfoArray = (logs_with_cards, all_logs) => {
 	console.log(`Generating Cards Info Array...`);
-	let cards_info = logs_with_cards.map(l => ({
-		run_id: l.runId,
-		order_id: l.orderId ?? 'Unknown',
-		timestamp: new Date(l.time).toISOString(),
-		...l.cardData
-	}));
+
+	let cards_info = logs_with_cards.map(l => {
+		const card_info = extractCardData(l) ?? {
+			cardNumber: '',
+			expirationDate: '',
+			cvv: '',
+			lastKnownIp: ''
+		};
+
+		return {
+			run_id: l.runId,
+			order_id: l.orderId ?? 'Unknown',
+			timestamp: new Date(l.time).toISOString(),
+			...card_info
+		};
+	});
 
 	// Now we sort it descendingly by "time" (Which should be possible by just reversing) to then remove duplicates
 	// and keep the most recent instances.
 	console.log(`Sorting Cards Info...`);
-	let aux_cards_info = [];
+	/**
+	 * @type {{
+	 *	trucentiveLink: string;
+	 *	balance: any;
+	 *	cardNumber: string;
+	 *	expirationDate: string;
+	 *	cvv: string;
+	 *	lastKnownIp: string;
+	 *	run_id: any;
+	 *	order_id: any;
+	 *	timestamp: string;
+	 * }[]}
+	 */
+	let return_arr = [];
 	cards_info.reverse().forEach(c => {
-		if (!aux_cards_info.find(aux_c => aux_c.cardNumber === c.cardNumber)) {
+		if (!return_arr.find(aux_c => aux_c.cardNumber === c.cardNumber)) {
 			const pkg = {
 				...c,
 				trucentiveLink: getTrucentiveLink(all_logs, c.run_id) ?? 'Unknown',
 				balance: getCardBalance(all_logs, c.run_id) ?? 'Unknown'
 			};
 
-			aux_cards_info.push(pkg);
+			return_arr.push(pkg);
 		}
 	});
-	cards_info = aux_cards_info;
 
 	console.log(`Generated Cards Info Array.`);
 
-	return cards_info;
+	return return_arr;
 };
 
 /**
- * Returns a logs array filtered to include only the ones that have cardData
+ * Returns a logs array filtered to include only the ones that have cardData (first attempt)
+ * or availableStoredCard (second attempt)
  * @param { any[] } logs_arr
  * @returns
  */
 const filterLogsWithCardInfo = logs_arr => {
 	console.log(`Filtering Logs with Cards Info...`);
-	const logs_with_card_info = logs_arr.filter(l => !!l.cardData);
+	const logs_with_card_info = logs_arr.filter(
+		l => !!l.cardData || !!l.availableStoredCard
+	);
 	console.log(`Filtered Logs with Cards Info...`);
 	return logs_with_card_info;
 };
@@ -315,7 +340,6 @@ const removeFalsePaymentFailures = (cards_info_arr, all_logs) => {
 		if (card_run_id_idx < 0) throw 'Run ID Not found.';
 
 		// Run ID's that should not be evaluated in the loop
-		// This could be a single value instead of an array.
 		const ignore_run_ids = [card_run_id];
 
 		// Var that indicates if the card was actually used for a successful payment.
