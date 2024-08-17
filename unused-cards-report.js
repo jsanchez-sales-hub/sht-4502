@@ -497,7 +497,12 @@ const storeSingleInDb = async card_info => {
 			+balance
 		);
 		console.log(`Storing payment_attempt...`);
-		await dbService.savePaymentAttempt(run_id, card_record.id, order_id);
+		await dbService.savePaymentAttempt(
+			run_id,
+			card_record.id,
+			timestamp,
+			order_id
+		);
 		return true;
 	} catch (err) {
 		console.error(err);

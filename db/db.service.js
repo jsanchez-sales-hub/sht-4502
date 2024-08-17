@@ -38,6 +38,8 @@ class DbService {
 		trucentive_link,
 		balance
 	) {
+		const timestamp_string = timestamp.slice(0, 19).replace('T', ' ');
+
 		const [id] = await this.knx('cards')
 			.insert({
 				card_number,
@@ -50,7 +52,9 @@ class DbService {
 				last_run_id: run_id,
 				was_attempted: true,
 				was_successful: false,
-				is_past_run: true
+				is_past_run: true,
+				updated_at: timestamp_string,
+				created_at: timestamp_string
 			})
 			.onConflict('card_number')
 			.ignore();
@@ -73,15 +77,24 @@ class DbService {
 	 *
 	 * @param {string} run_id
 	 * @param {number} card_id
+	 * @param {string} attempted_at
 	 * @param {string | undefined} order_id
 	 * @returns {Promise<PaymentAttempt>}
 	 */
-	async savePaymentAttempt(run_id, card_id, order_id = undefined) {
+	async savePaymentAttempt(
+		run_id,
+		card_id,
+		attempted_at,
+		order_id = undefined
+	) {
+		const _attempted_at = attempted_at.slice(0, 19).replace('T', ' ');
+
 		const [id] = await this.knx('payment_attempts')
 			.insert({
 				run_id,
 				order_id,
-				card_id
+				card_id,
+				attempted_at: _attempted_at
 			})
 			.onConflict('run_id')
 			.ignore();
