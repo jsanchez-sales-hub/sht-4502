@@ -2,6 +2,7 @@ const Fs = require('fs');
 const Path = require('path');
 const ReadLine = require('node:readline');
 const { arrayToCSV, csvToArray, waitFor } = require('./utils');
+const dbService = require('./db/db.service');
 require('dotenv').config();
 
 const log_storage_path = Path.join(__dirname, 'logs-storage');
@@ -16,6 +17,11 @@ const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
  * @type { string }
  */
 const LOG = 'mid';
+
+/**
+ * Specifies if report should store to DB.
+ */
+const USE_DB = process.argv.slice(2).includes('--db');
 
 /**
  * Creates set of strings of logs' run_id only where the program reached a point of logging a card's information.
@@ -417,6 +423,88 @@ const removePnmReportedPaid = (cards_info_arr, pnm_report_arr) => {
 	return return_arr;
 };
 
+/**
+ * @param {{
+ *  run_id: string;
+ *  order_id: string;
+ *  timestamp: string;
+ *  cardNumber: string;
+ *  expirationDate: string;
+ *  cvv: string;
+ *  lastKnownIp: string;
+ *  trucentiveLink: string;
+ *  balance: string | number;
+ * }[]} cards_info
+ */
+const storeInDb = async cards_info => {
+	console.log(`Importing info in database...`);
+
+	const total = cards_info.length;
+
+	for (let [index, card] of cards_info.entries()) {
+		console.log(
+			`Importing to database: ${index + 1} of ${total}. Info: ${JSON.stringify(card)}`
+		);
+		const result = await storeSingleInDb(card);
+		if (result) {
+			console.log(`Imported to database: ${index + 1} of ${total}.`);
+		} else {
+			console.error(`Error importing to database: ${index + 1} of ${total}.`);
+		}
+	}
+
+	console.log(`Finished importing info in database.`);
+};
+
+/**
+ * @param {{
+ *  run_id: string;
+ *  order_id: string;
+ *  timestamp: string;
+ *  cardNumber: string;
+ *  expirationDate: string;
+ *  cvv: string;
+ *  lastKnownIp: string;
+ *  trucentiveLink: string;
+ *  balance: string | number;
+ * }} card_info
+ *
+ * @returns {Promise<boolean>}
+ */
+const storeSingleInDb = async card_info => {
+	const {
+		run_id,
+		order_id,
+		timestamp,
+		cardNumber,
+		expirationDate,
+		cvv,
+		lastKnownIp,
+		trucentiveLink,
+		balance
+	} = card_info;
+	try {
+		console.log(`Storing card...`);
+		const card_record = await dbService.saveCard(
+			run_id,
+			order_id,
+			timestamp,
+			cardNumber,
+			expirationDate,
+			cvv,
+			lastKnownIp,
+			trucentiveLink,
+			+balance
+		);
+		console.log(`Storing payment_attempt...`);
+		await dbService.savePaymentAttempt(run_id, card_record.id, order_id);
+		return true;
+	} catch (err) {
+		console.error(err);
+		return false;
+	}
+};
+
 const asyncMain = async () => {
 	console.log(`Starting Unused Cards Report...`);
 	/**
@@ -508,6 +596,8 @@ const asyncMain = async () => {
 	const cards_info_csv = arrayToCSV(cards_info_output);
 
 	Fs.writeFileSync(output_path, cards_info_csv);
+
+	if (USE_DB) await storeInDb(cards_info_output);
 
 	console.log(`Finished Unused Cards Report.`);
 };
