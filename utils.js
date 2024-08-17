@@ -1,6 +1,7 @@
 const Fs = require('fs');
 const { exec } = require('child_process');
 const SSHClient = require('ssh2').Client;
+require('dotenv').config();
 
 const pem_filepath = process.env.PEM_FILEPATH ?? 'ubuntu.pem';
 const ssh = {
