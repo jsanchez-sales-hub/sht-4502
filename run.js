@@ -6,6 +6,10 @@ const SSHClient = require('ssh2').Client;
 require('dotenv').config();
 const PM2 = require('pm2');
 
+const UNUSED_CARDS = process.argv.slice(2).includes('--unused-cards');
+const USE_DB = process.argv.slice(2).includes('--db');
+const ATTEMPTS = process.argv.slice(2).includes('--attempts');
+
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
 const current_log_path = Path.join(log_storage_path, 'current.log');
@@ -148,16 +152,18 @@ const connectToPm2 = async () => {
 
 /**
  *
- * @param {'unused-cards-report' | 'payment-attempts-report'} script
+ * @param {'unused-cards-report' | 'payment-attempts-report' | 'unused-cards-db-report'} script
  */
 const startPm2 = async script => {
 	return new Promise((resolve, reject) => {
-		const json_config_file = Path.join(
-			__dirname,
+		const script_name =
 			script === 'unused-cards-report'
 				? 'unused-cards.config.js'
-				: 'payment-attempts.config.js'
-		);
+				: script === 'payment-attempts-report'
+					? 'payment-attempts.config.js'
+					: 'unused-cards-db.config.js';
+
+		const json_config_file = Path.join(__dirname, script_name);
 
 		PM2.start(json_config_file, (start_err, apps) => {
 			if (start_err) {
@@ -176,8 +182,11 @@ const asyncMain = async () => {
 
 	await connectToPm2();
 
-	await startPm2('payment-attempts-report');
-	await startPm2('unused-cards-report');
+	if (ATTEMPTS) await startPm2('payment-attempts-report');
+	if (UNUSED_CARDS) {
+		if (USE_DB) await startPm2('unused-cards-db-report');
+		else await startPm2('unused-cards-report');
+	}
 
 	return;
 };
