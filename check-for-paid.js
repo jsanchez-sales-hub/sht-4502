@@ -1631,6 +1631,7 @@ const asyncMain = async () => {
 			console.log(
 				`It was successfully paid on ${pnm_elem['Payment Date']}; that's why it doesn't show anymore. Found in PNM Report.`
 			);
+			continue;
 		}
 
 		/** @type {string} */
