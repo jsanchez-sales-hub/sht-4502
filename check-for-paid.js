@@ -1,7 +1,10 @@
 const Path = require('path');
-const { execute } = require('./utils');
+const Fs = require('fs');
+const { execute, csvToArray } = require('./utils');
 const log_storage_path = Path.join(__dirname, 'logs-storage');
 const all_time_log_path = Path.join(log_storage_path, 'all-time.log');
+require('dotenv').config();
+const pnm_report_filepath = process.env.PNM_REPORT_FILEPATH ?? null;
 
 let str_arr = [
 	'4343405617943567',
@@ -1576,6 +1579,13 @@ let str_arr = [
 	'434340700946'
 ];
 
+/**
+ * @type {{ Name: string, Account: string, "Payment Date": string, Status: string, "Net Customer Payment": string, "Payment Method": string, "Payment Type": string }[]}
+ */
+let pnm_report_arr = pnm_report_filepath
+	? csvToArray(Fs.readFileSync(pnm_report_filepath).toString())
+	: [];
+
 const asyncMain = async () => {
 	const total = str_arr.length;
 	for (let [index, cardNumber] of str_arr.entries()) {
@@ -1607,6 +1617,21 @@ const asyncMain = async () => {
 						}
 					})
 			: [];
+
+		// Find Order ID and, if found, look it up in PNM Report.
+		let pnm_elem;
+		let grep_item_with_order_id = grep_arr.find(grep => !!grep.orderId);
+		if (grep_item_with_order_id) {
+			pnm_elem = pnm_report_arr.find(
+				pnm => pnm.Account === grep_item_with_order_id.orderId
+			);
+		}
+
+		if (pnm_elem) {
+			console.log(
+				`It was successfully paid on ${pnm_elem['Payment Date']}; that's why it doesn't show anymore. Found in PNM Report.`
+			);
+		}
 
 		/** @type {string} */
 		const last_run_id = grep_arr.find(g => !!g.runId)?.runId;
